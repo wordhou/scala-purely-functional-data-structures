@@ -8,15 +8,15 @@ import scala.collection.immutable
 case class BinomialHeap[T](nodes: List[Node[T]] = Nil)(implicit ordering: Ordering[T])
   extends immutable.Iterable[T] {
 
-  def +[B >: T](value: B): BinomialHeap[T] = appended(value)
+  def +(value: T): BinomialHeap[T] = appended(value)
 
-  def appended[B >: T](value: B): BinomialHeap[T] = BinomialHeap(BinomialHeap.insertTree(Node(value), nodes))
+  def appended(value: T): BinomialHeap[T] = BinomialHeap(BinomialHeap.insertTree(Node(value), nodes))
 
-  def ++[B >: T](other: BinomialHeap[B]): BinomialHeap[T] = concat(other)
+  def ++(other: BinomialHeap[T]): BinomialHeap[T] = concat(other)
 
-  def concat[B >: T](other: BinomialHeap[B]): BinomialHeap[T] = BinomialHeap(BinomialHeap.merge(nodes, other.nodes))
+  def concat(other: BinomialHeap[T]): BinomialHeap[T] = BinomialHeap(BinomialHeap.merge(nodes, other.nodes))
 
-  def :++[B >: T](suffix: IterableOnce[B]): BinomialHeap[T] = suffix.iterator.foldLeft(this)((heap, value) => heap + value)
+  def :++(suffix: IterableOnce[T]): BinomialHeap[T] = suffix.iterator.foldLeft(this)((heap, value) => heap + value)
 
   override def size: Int = nodes.map(_.size).sum
 
@@ -36,7 +36,7 @@ case class BinomialHeap[T](nodes: List[Node[T]] = Nil)(implicit ordering: Orderi
   }
 
   def iterator: Iterator[T] = new Iterator[T] {
-    private var heap: BinomialHeap[T] = this[BinomialHeap]
+    private var heap: BinomialHeap[T] = BinomialHeap.this
 
     override def hasNext: Boolean = !heap.isEmpty
 
@@ -50,6 +50,14 @@ case class BinomialHeap[T](nodes: List[Node[T]] = Nil)(implicit ordering: Orderi
 
 object BinomialHeap {
   /**
+   * Creates an empty binomial heap.
+   * @param ordering The ordering by which the heap orders its members
+   * @tparam A The type of elements contained in the heap
+   * @return An empty binomial heap
+   */
+  def empty[A](implicit ordering: Ordering[A]): BinomialHeap[A] = BinomialHeap()
+
+  /**
    * A multi-way tree node where every node contains a value, and the shape satisfies the Binomial tree property.
    * A multi-way tree of rank `n` satisfies the binomial tree property if each of its children is also a binomial tree
    * descending ranks from `n - 1, ..., 0`.
@@ -58,7 +66,7 @@ object BinomialHeap {
    * @param nodes The children of the node
    * @tparam A The type of element contained in the tree
    */
-  private case class Node[A](value: A, rank: Int = 0, nodes: List[Node[A]] = Nil) {
+  protected case class Node[A](value: A, rank: Int = 0, nodes: List[Node[A]] = Nil) {
     /**
      * Creates a new node with another node added to the children of this node.
      * @param other The node to add
@@ -73,7 +81,7 @@ object BinomialHeap {
     def size: Int = 1 << rank
   }
 
-  private object Node {
+  protected object Node {
     def link[T](a: Node[T], b: Node[T])(implicit ordering: Ordering[T]): Node[T] = {
       require(a.rank == b.rank)
       if (ordering.compare(a.value, b.value) <= 0) a add b
