@@ -1,56 +1,42 @@
-package immutable
+package word.immutable
 
-import BinomialHeap.Node
+import word.immutable.BinomialHeap.Node
 
 import scala.annotation.tailrec
-import scala.collection.immutable
 
 case class BinomialHeap[T](nodes: List[Node[T]] = Nil)(implicit ordering: Ordering[T])
-  extends immutable.Iterable[T] {
-
-  def +(value: T): BinomialHeap[T] = appended(value)
+  extends MergeableHeap[T, BinomialHeap[T]] {
 
   def appended(value: T): BinomialHeap[T] = BinomialHeap(BinomialHeap.insertTree(Node(value), nodes))
 
-  def ++(other: BinomialHeap[T]): BinomialHeap[T] = concat(other)
-
-  def concat(other: BinomialHeap[T]): BinomialHeap[T] = BinomialHeap(BinomialHeap.merge(nodes, other.nodes))
-
-  def :++(suffix: IterableOnce[T]): BinomialHeap[T] = suffix.iterator.foldLeft(this)((heap, value) => heap + value)
+  def merge(other: BinomialHeap[T]): BinomialHeap[T] = BinomialHeap(BinomialHeap.merge(nodes, other.nodes))
 
   override def size: Int = nodes.map(_.size).sum
 
   override def isEmpty: Boolean = nodes.isEmpty
 
-  def findAndDeleteMin(): Option[(T, BinomialHeap[T])] =
+  def firstAndRestOption: Option[(T, BinomialHeap[T])] =
     BinomialHeap.removeMinTreeOptional(nodes).map {
       case (t, ts) => (t.value, BinomialHeap(BinomialHeap.merge(t.nodes.reverse, ts)))
     }
 
-  def findMin(): Option[T] = BinomialHeap.removeMinTreeOptional(nodes).map {
-    case (t, _) => t.value
-  }
-
-  def deleteMin(): Option[BinomialHeap[T]] = BinomialHeap.removeMinTreeOptional(nodes).map {
-    case (t, ts) => BinomialHeap(BinomialHeap.merge(t.nodes.reverse, ts))
-  }
-
-  def iterator: Iterator[T] = new Iterator[T] {
-    private var heap: BinomialHeap[T] = BinomialHeap.this
-
-    override def hasNext: Boolean = !heap.isEmpty
-
-    override def next(): T = {
-      val Some((value, nextHeap)) = heap.findAndDeleteMin()
-      heap = nextHeap
-      value
-    }
-  }
+  def iterator: MergeableHeapIterator[T, BinomialHeap[T]] = new MergeableHeapIterator[T, BinomialHeap[T]](this)
 }
 
 object BinomialHeap {
   /**
+   * Creates a binomial heap from an IterableOnce
+   *
+   * @param ordering The ordering by which the heap orders its members
+   * @tparam A The type of elements contained in the heap
+   * @return An empty binomial heap
+   */
+  def from[A](iterableOnce: IterableOnce[A])(implicit ordering: Ordering[A]): BinomialHeap[A] =
+    iterableOnce.iterator.foldLeft(empty[A])((heap, value) => heap + value)
+
+  /**
    * Creates an empty binomial heap.
+   *
    * @param ordering The ordering by which the heap orders its members
    * @tparam A The type of elements contained in the heap
    * @return An empty binomial heap
@@ -61,8 +47,9 @@ object BinomialHeap {
    * A multi-way tree node where every node contains a value, and the shape satisfies the Binomial tree property.
    * A multi-way tree of rank `n` satisfies the binomial tree property if each of its children is also a binomial tree
    * descending ranks from `n - 1, ..., 0`.
+   *
    * @param value The value associated with the node
-   * @param rank The number of children of the node
+   * @param rank  The number of children of the node
    * @param nodes The children of the node
    * @tparam A The type of element contained in the tree
    */

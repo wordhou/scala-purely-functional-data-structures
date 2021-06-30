@@ -1,32 +1,20 @@
-package immutable
+package word.immutable
 
-import scala.collection.immutable.Iterable
-
-sealed abstract class LeftistHeap[A](implicit ordering: Ordering[A]) extends Iterable[A] {
+sealed abstract class LeftistHeap[A](implicit ordering: Ordering[A]) extends MergeableHeap[A, LeftistHeap[A]] {
   def rank: Int
-
-  def +(value: A): LeftistHeap[A] = appended(value)
 
   def appended(value: A): LeftistHeap[A] = LeftistHeap.merge(this, LeftistHeap.singleton(value))
 
-  def ++(other: LeftistHeap[A]): LeftistHeap[A] = concat(other)
+  def merge(other: LeftistHeap[A]): LeftistHeap[A] = LeftistHeap.merge(this, other)
 
-  def concat(other: LeftistHeap[A]): LeftistHeap[A] = LeftistHeap.merge(this, other)
-
-  def :++(suffix: IterableOnce[A]): LeftistHeap[A] =
-    suffix.iterator.foldLeft(this)((heap, value) => heap appended value)
-
-  def findAndDeleteMin(): Option[(A, LeftistHeap[A])]
-
-  def findMin(): Option[A] = findAndDeleteMin().map(_._1)
-
-  def deleteMin(): Option[LeftistHeap[A]] = findAndDeleteMin().map(_._2)
-
-  override def iterator: Iterator[A] = new LeftistHeapIterator[A](this)
+  override def iterator: Iterator[A] = new MergeableHeapIterator[A, LeftistHeap[A]](this)
 }
 
 object LeftistHeap {
-  def empty[A](implicit ordering: Ordering[A]): Empty[A] = Empty[A]()
+  def from[A](iterableOnce: IterableOnce[A])(implicit ordering: Ordering[A]): LeftistHeap[A] =
+    iterableOnce.iterator.foldLeft(empty[A])((heap, value) => heap + value)
+
+  def empty[A](implicit ordering: Ordering[A]): LeftistHeap[A] = Empty[A]()
 
   def singleton[A](value: A)(implicit ordering: Ordering[A]): LeftistHeap[A] = Node(value, 1, Empty[A](), Empty[A]())
 
@@ -48,7 +36,9 @@ object LeftistHeap {
     override val rank: Int = 0
     override val isEmpty = true
 
-    override def findAndDeleteMin(): Option[(A, LeftistHeap[A])] = None
+    override def firstAndRestOption: Option[(A, LeftistHeap[A])] = None
+
+    override def merge(other: LeftistHeap[A]): LeftistHeap[A] = other
   }
 
   protected case class Node[A](value: A,
@@ -60,17 +50,8 @@ object LeftistHeap {
 
     override def size: Int = 1 + left.size + right.size
 
-    override def findAndDeleteMin(): Option[(A, LeftistHeap[A])] =
-      Some((value, merge(left, right)))
-  }
-}
-
-private class LeftistHeapIterator[A](var heap: LeftistHeap[A]) extends Iterator[A] {
-  override def hasNext: Boolean = heap.nonEmpty
-
-  override def next(): A = {
-    val Some((head, tail)) = heap.findAndDeleteMin()
-    heap = tail
-    head
+    override def firstAndRestOption: Option[(A, LeftistHeap[A])] = {
+      Some((value, left ++ right))
+    }
   }
 }
